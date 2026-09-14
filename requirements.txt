@@ -1,0 +1,7 @@
+# Uncomment to enable Azure Monitor OpenTelemetry
+# Ref: aka.ms/functions-azure-monitor-python
+# azure-monitor-opentelemetry
+
+azure-functions
+mssql-python==1.13.0
+mssql-python-odbc==18.6.2.1
