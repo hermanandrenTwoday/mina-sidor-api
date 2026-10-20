@@ -6,3 +6,10 @@ __queuestorage__
 local.settings.json
 test
 .venv
+
+# Repository material that is not part of the Function App runtime
+README.md
+local.settings.sample.json
+docs/
+database/
+*.log

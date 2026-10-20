@@ -13,16 +13,15 @@ Azure Functions API for the Mina Sidor integration with BEM.
 
 Prerequisites:
 
-- Python 3.13
+- Python 3.12
 - Azure Functions Core Tools v4
 - Azurite (needed when local storage bindings are enabled)
 
-Create and activate a virtual environment, then install dependencies:
+Create an ASCII-only virtual-environment path, then install dependencies. This avoids native SQL driver loading problems caused by the accented character in the Windows user path:
 
 ```powershell
-py -3.13 -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install -r requirements.txt
+py -3.12 -m venv C:\mina-sidor-api-venv312
+C:\mina-sidor-api-venv312\Scripts\python.exe -m pip install -r requirements.txt
 ```
 
 Create your local settings file from the template and fill in your own SQL Server connection string:
@@ -30,6 +29,8 @@ Create your local settings file from the template and fill in your own SQL Serve
 ```powershell
 Copy-Item local.settings.sample.json local.settings.json
 ```
+
+Set `languageWorkers__python__defaultExecutablePath` in `local.settings.json` to `C:\\mina-sidor-api-venv312\\Scripts\\python.exe`. Do not activate the old project `.venv`; if its name appears in the PowerShell prompt, run `deactivate` before `func start`.
 
 `local.settings.json` contains secrets and is intentionally ignored by Git.
 

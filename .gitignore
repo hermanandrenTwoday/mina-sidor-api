@@ -97,6 +97,8 @@ celerybeat-schedule
 
 # Environments
 .env
+sql_conn-str.env
+minasidor-deploy.zip
 .venv
 env/
 venv/
