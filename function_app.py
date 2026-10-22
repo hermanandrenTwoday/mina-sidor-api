@@ -48,9 +48,9 @@ def KundKontaktPerson(req: func.HttpRequest) -> func.HttpResponse:
             status_code=400,
         )
 
-    if not personnr.isdigit() or len(personnr) != 12:
+    if not personnr.isdigit():
         return func.HttpResponse(
-            "Invalid 'personnr' format. It should be a 12-digit number.",
+            "Invalid 'personnr' format. It should be a number.",
             status_code=400,
         )
 
@@ -88,8 +88,14 @@ def AnlaggningsKontaktperson(req: func.HttpRequest) -> func.HttpResponse:
             status_code=400,
         )
 
+    if not kundnr.isdigit():
+            return func.HttpResponse(
+                "Invalid 'kundnr' format. It should be a number.",
+                status_code=400,
+            )
+
     query = """
-        SELECT intKundNr, strAnlnr, strForNamn, strEfterNamn, strEpostadress, strTelefonMobil, strTelefon
+        SELECT intRecnum, intKundNr, strAnlnr, strPersonnr, strForNamn, strEfterNamn, strEpostadress, strTelefonMobil, strTelefon
         FROM [TX_MDW_Dev].[MDW].[tbFuAnlaggningsKontaktperson]
         WHERE intKundNr = %(kundnr)s;
     """
