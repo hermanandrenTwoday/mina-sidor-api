@@ -273,3 +273,99 @@ def MiljorapportFjarrvarme(req: func.HttpRequest) -> func.HttpResponse:
         status_code=200,
         mimetype="application/json",
     )
+
+@app.route(route="MiljorapportAvfall", methods=["GET"])
+def MiljorapportAvfall(req: func.HttpRequest) -> func.HttpResponse:
+    Anlaggningsnummer = req.params.get("Anlaggningsnummer")
+    periodFran = req.params.get("periodFran")
+    periodTom = req.params.get("periodTom")
+
+    if not Anlaggningsnummer:
+        return func.HttpResponse(
+            "Missing 'Anlaggningsnummer' query parameter.",
+            status_code=400,
+        )               
+
+    if not periodFran or not periodTom:
+        return func.HttpResponse(
+            "Missing 'periodFran' or 'periodTom' query parameter.",
+            status_code=400,
+        )
+
+    query = """
+        SELECT 
+        Anläggningsnummer,
+        Adress,
+        Tjänstetyp,
+        Avfallskod,
+        AvfallskodBeskrivning,
+            CASE
+                WHEN [ÄrVolymtyp] = 0 THEN SUM([ViktAttAnvända])
+                ELSE NULL
+            END AS viktKg,
+            CASE
+                WHEN [ÄrVolymtyp] = 1 THEN SUM([VolymAttAnvända])
+                ELSE NULL
+            END AS volymM3,
+        [TypAvVikt]
+        from [TX_MDW_Dev].[MDW].[MiljörapportAvfallAggregated]
+        where Anläggningsnummer = %(Anlaggningsnummer)s
+            AND [PeriodÅrMånad] BETWEEN %(periodFran)s AND %(periodTom)s
+        
+        group by
+
+        Anläggningsnummer,
+        Adress,
+        Tjänstetyp,
+        Avfallskod,
+        AvfallskodBeskrivning,
+        ÄrVolymtyp,
+        TypAvVikt
+
+        ORDER BY [Tjänstetyp];
+        """
+
+    try:
+        rows = execute_select(query, {"Anlaggningsnummer": Anlaggningsnummer,
+                                       "periodFran": periodFran,
+                                        "periodTom": periodTom},
+                             database="dev")
+    except Exception as error:
+        logging.exception("Database request failed.")
+        return func.HttpResponse(
+            "Database request failed.",
+            status_code=500,
+        )   
+    
+    try:
+        data = [
+            {
+                "rapportFran": periodFran,
+                "rapportTom": periodTom,
+                "anlaggningsnummer": str(row["Anläggningsnummer"]),
+                "adress": row["Adress"],
+                "tjanstetyp": row["Tjänstetyp"],
+                "avfallskod": row["Avfallskod"],
+                "avfallskodBeskrivning": row["AvfallskodBeskrivning"],
+                "viktKg": row["viktKg"],
+                "volymM3": row["volymM3"],
+                "typAvVikt": row["TypAvVikt"],
+            }
+            for row in rows
+        ]
+
+        payload = {
+            "data": data,
+        }
+
+        return func.HttpResponse(
+            json.dumps(payload, ensure_ascii=False, default=float),
+            status_code=200,
+            mimetype="application/json",
+        )
+    except Exception as error:
+        logging.exception("Response formatting failed.")
+        return func.HttpResponse(
+            "Response formatting failed.",
+            status_code=500,
+        )
