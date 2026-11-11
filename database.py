@@ -2,11 +2,24 @@ import os
 import mssql_python
 
 
-def execute_select(query: str, parameters: dict) -> list[dict]:
-    connection_string = os.environ.get("SQL_CONNECTION_STRING_DEV")
+CONNECTION_STRING_SETTINGS = {
+    "dev": "SQL_CONNECTION_STRING_DEV",
+    "prod": "SQL_CONNECTION_STRING_PROD",
+}
+
+
+def execute_select(
+    query: str, parameters: dict, database: str = "prod"
+) -> list[dict]:
+    setting_name = CONNECTION_STRING_SETTINGS.get(database)
+
+    if not setting_name:
+        raise ValueError(f"Unknown database target: {database}")
+
+    connection_string = os.environ.get(setting_name)
 
     if not connection_string:
-        raise RuntimeError("SQL_CONNECTION_STRING_DEV is not configured.")
+        raise RuntimeError(f"{setting_name} is not configured.")
 
     connection = None
 
