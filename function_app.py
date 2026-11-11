@@ -138,21 +138,30 @@ def KopHistorik(req: func.HttpRequest) -> func.HttpResponse:
         )
 
     query = """
-            SELECT
-            [FakturadatumÅrMånad] AS fakturadatumArManad,
-            [Kundnummer] AS kundnummer,
+        SELECT
             [Anläggningsnummer] AS anlaggningsnummer,
             [Anläggningsadress] AS anlaggningsadress,
             [Produkt] AS produkt,
             [Tjänst] AS tjanst,
             [Avser] AS avser,
             [Enhet] AS enhet,
-            [SumBelopp] AS pris,
-            [SumAntal] AS antal
+            SUM([SumBelopp]) AS nettoforsaljning,
+            SUM([SumAntal]) AS antal
         FROM [TX_MDW_Prod].[MDW].[Köphistorik]
-        WHERE kundnummer = %(kundnr)s
-        AND FakturadatumÅrMånad BETWEEN %(fromDate)s AND %(toDate)s
-        ORDER BY [FakturadatumÅrMånad] DESC, [Anläggningsnummer];
+        WHERE [Kundnummer] = %(kundnr)s
+        AND [FakturadatumÅrMånad] BETWEEN %(fromDate)s AND %(toDate)s
+        GROUP BY
+            [Anläggningsnummer],
+            [Anläggningsadress],
+            [Produkt],
+            [Tjänst],
+            [Avser],
+            [Enhet]
+        ORDER BY
+            [Anläggningsnummer],
+            [Produkt],
+            [Tjänst],
+            [Avser];
 """
 
     try:
@@ -166,7 +175,6 @@ def KopHistorik(req: func.HttpRequest) -> func.HttpResponse:
 
     data = [
         {
-            "fakturadatumArManad": row["fakturadatumArManad"],
             "anlaggning": {
                 "nummer": str(row["anlaggningsnummer"]),
                 "adress": row["anlaggningsadress"],
@@ -175,8 +183,8 @@ def KopHistorik(req: func.HttpRequest) -> func.HttpResponse:
             "tjanst": row["tjanst"],
             "avser": row["avser"],
             "enhet": row["enhet"],
-            "pris": float(row["pris"]),
-            "antal": float(row["antal"]),
+            "nettoforsaljning": row["nettoforsaljning"],
+            "antal": row["antal"],
         }
         for row in rows
     ]
@@ -191,7 +199,7 @@ def KopHistorik(req: func.HttpRequest) -> func.HttpResponse:
     }
 
     return func.HttpResponse(
-        json.dumps(payload, ensure_ascii=False),
+        json.dumps(payload, ensure_ascii=False, default=float),
         status_code=200,
         mimetype="application/json",
     )
@@ -215,20 +223,27 @@ def MiljorapportFjarrvarme(req: func.HttpRequest) -> func.HttpResponse:
         )
 
     query = """
-        SELECT 
-            PeriodÅrMånad,
-            Anlaggningsnummer,
-            Adress, 
-            ForbrukningKwh,
-            Co2UtsläppKg
-        FROM [TX_MDW_Prod].[MDW].[MiljorapportFjarrvarme]
-        WHERE Anlaggningsnummer = %(Anlaggningsnummer)s
-        PeriodÅrMånad BETWEEN %(periodFran)s AND %(periodTom)s
-        ORDER BY PeriodÅrMånad;
+        SELECT
+            [Anläggningsnummer],
+            [Adress],
+            SUM([ForbrukningKwh]) AS [ForbrukningKwh],
+            SUM([Co2Utsläpp]) AS [Co2Utsläpp],
+            [Taxa] AS [Taxa]
+        FROM [TX_MDW_Prod].[MDW].[MiljörapportFjärrvärme]
+        WHERE [Anläggningsnummer] = %(Anlaggningsnummer)s
+        AND [PeriodÅrMånad] BETWEEN %(periodFran)s AND %(periodTom)s
+        GROUP BY
+            [Anläggningsnummer],
+            [Adress],
+            [Taxa]
+        order by Taxa;
     """
 
     try:
-        rows = execute_select(query, {"Anlaggningsnummer": Anlaggningsnummer, "periodFran": periodFran, "periodTom": periodTom}, database="prod")
+        rows = execute_select(query, {"Anlaggningsnummer": Anlaggningsnummer,
+                                       "periodFran": periodFran,
+                                        "periodTom": periodTom},
+                             database="prod")
     except Exception as error:
         logging.exception("Database request failed.")
         return func.HttpResponse(
@@ -238,28 +253,23 @@ def MiljorapportFjarrvarme(req: func.HttpRequest) -> func.HttpResponse:
 
     data = [
         {
-            "periodArManad": row["PeriodÅrMånad"],
-            "anlaggning": {
-                "nummer": str(row["Anlaggningsnummer"]),
-                "adress": row["Adress"],
-            },
-            "forbrukningKwh": float(row["ForbrukningKwh"]),
-            "co2UtslappKg": float(row["Co2UtsläppKg"]),
+            "rapportFran": periodFran,
+            "rapportTom": periodTom,
+            "anlaggningsnummer": str(row["Anläggningsnummer"]),
+            "adress": row["Adress"],
+            "forbrukningKwh": row["ForbrukningKwh"],
+            "co2UtslappGram": row["Co2Utsläpp"],
+            "taxa": row["Taxa"],
         }
         for row in rows
-    ]           
+    ]
 
     payload = {
-        "rapportperiod": {
-            "fran": periodFran,
-            "tom": periodTom,
-        },
-        "anlaggningsnummer": int(Anlaggningsnummer),
         "data": data,
     }
 
     return func.HttpResponse(
-        json.dumps(payload, ensure_ascii=False),
+        json.dumps(payload, ensure_ascii=False, default=float),
         status_code=200,
         mimetype="application/json",
     )

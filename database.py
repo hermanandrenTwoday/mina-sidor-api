@@ -24,7 +24,7 @@ def execute_select(
     connection = None
 
     try:
-        connection = mssql_python.connect(connection_string, timeout=5)
+        connection = mssql_python.connect(connection_string, timeout=30)
 
         cursor = connection.cursor()
         cursor.execute(query, parameters)
