@@ -9,6 +9,11 @@ from database import execute_select
 
 app = func.FunctionApp(http_auth_level=func.AuthLevel.FUNCTION)
 
+
+def to_month_period(date_value: str) -> str:
+    return date_value[:7]
+
+
 @app.route(route="health", methods=["GET"])
 def health(req: func.HttpRequest) -> func.HttpResponse:
     return func.HttpResponse(
@@ -137,6 +142,9 @@ def KopHistorik(req: func.HttpRequest) -> func.HttpResponse:
             status_code=400,
         )
 
+    fromPeriod = to_month_period(fromDate)
+    toPeriod = to_month_period(toDate)
+
     query = """
         SELECT
             [Anläggningsnummer] AS anlaggningsnummer,
@@ -149,7 +157,7 @@ def KopHistorik(req: func.HttpRequest) -> func.HttpResponse:
             SUM([SumAntal]) AS antal
         FROM [TX_MDW_Prod].[MDW].[Köphistorik]
         WHERE [Kundnummer] = %(kundnr)s
-        AND [FakturadatumÅrMånad] BETWEEN %(fromDate)s AND %(toDate)s
+        AND [FakturadatumÅrMånad] BETWEEN %(fromPeriod)s AND %(toPeriod)s
         GROUP BY
             [Anläggningsnummer],
             [Anläggningsadress],
@@ -165,7 +173,11 @@ def KopHistorik(req: func.HttpRequest) -> func.HttpResponse:
 """
 
     try:
-        rows = execute_select(query, {"kundnr": kundnr, "fromDate": fromDate, "toDate": toDate}, database="prod")
+        rows = execute_select(
+            query,
+            {"kundnr": kundnr, "fromPeriod": fromPeriod, "toPeriod": toPeriod},
+            database="prod",
+        )
     except Exception as error:
         logging.exception("Database request failed.")
         return func.HttpResponse(
@@ -206,21 +218,24 @@ def KopHistorik(req: func.HttpRequest) -> func.HttpResponse:
 
 @app.route(route="MiljorapportFjarrvarme", methods=["GET"])
 def MiljorapportFjarrvarme(req: func.HttpRequest) -> func.HttpResponse:
-    Anlaggningsnummer = req.params.get("Anlaggningsnummer")
-    periodFran = req.params.get("periodFran")
-    periodTom = req.params.get("periodTom")
+    anlaggningsnr = req.params.get("anlaggningsnr")
+    fromDate = req.params.get("fromDate")
+    toDate = req.params.get("toDate")
 
-    if not Anlaggningsnummer:
+    if not anlaggningsnr:
         return func.HttpResponse(
-            "Missing 'Anlaggningsnummer' query parameter.",
+            "Missing 'anlaggningsnr' query parameter.",
             status_code=400,
         )               
 
-    if not periodFran or not periodTom:
+    if not fromDate or not toDate:
         return func.HttpResponse(
-            "Missing 'periodFran' or 'periodTom' query parameter.",
+            "Missing 'fromDate' or 'toDate' query parameter.",
             status_code=400,
         )
+
+    fromPeriod = to_month_period(fromDate)
+    toPeriod = to_month_period(toDate)
 
     query = """
         SELECT
@@ -230,8 +245,8 @@ def MiljorapportFjarrvarme(req: func.HttpRequest) -> func.HttpResponse:
             SUM([Co2Utsläpp]) AS [Co2Utsläpp],
             [Taxa] AS [Taxa]
         FROM [TX_MDW_Prod].[MDW].[MiljörapportFjärrvärme]
-        WHERE [Anläggningsnummer] = %(Anlaggningsnummer)s
-        AND [PeriodÅrMånad] BETWEEN %(periodFran)s AND %(periodTom)s
+        WHERE [Anläggningsnummer] = %(anlaggningsnr)s
+        AND [PeriodÅrMånad] BETWEEN %(fromPeriod)s AND %(toPeriod)s
         GROUP BY
             [Anläggningsnummer],
             [Adress],
@@ -240,10 +255,15 @@ def MiljorapportFjarrvarme(req: func.HttpRequest) -> func.HttpResponse:
     """
 
     try:
-        rows = execute_select(query, {"Anlaggningsnummer": Anlaggningsnummer,
-                                       "periodFran": periodFran,
-                                        "periodTom": periodTom},
-                             database="prod")
+        rows = execute_select(
+            query,
+            {
+                "anlaggningsnr": anlaggningsnr,
+                "fromPeriod": fromPeriod,
+                "toPeriod": toPeriod,
+            },
+            database="prod",
+        )
     except Exception as error:
         logging.exception("Database request failed.")
         return func.HttpResponse(
@@ -253,8 +273,8 @@ def MiljorapportFjarrvarme(req: func.HttpRequest) -> func.HttpResponse:
 
     data = [
         {
-            "rapportFran": periodFran,
-            "rapportTom": periodTom,
+            "rapportFran": fromDate,
+            "rapportTom": toDate,
             "anlaggningsnummer": str(row["Anläggningsnummer"]),
             "adress": row["Adress"],
             "forbrukningKwh": row["ForbrukningKwh"],
@@ -276,21 +296,24 @@ def MiljorapportFjarrvarme(req: func.HttpRequest) -> func.HttpResponse:
 
 @app.route(route="MiljorapportAvfall", methods=["GET"])
 def MiljorapportAvfall(req: func.HttpRequest) -> func.HttpResponse:
-    Anlaggningsnummer = req.params.get("Anlaggningsnummer")
-    periodFran = req.params.get("periodFran")
-    periodTom = req.params.get("periodTom")
+    anlaggningsnr = req.params.get("anlaggningsnr")
+    fromDate = req.params.get("fromDate")
+    toDate = req.params.get("toDate")
 
-    if not Anlaggningsnummer:
+    if not anlaggningsnr:
         return func.HttpResponse(
-            "Missing 'Anlaggningsnummer' query parameter.",
+            "Missing 'anlaggningsnr' query parameter.",
             status_code=400,
         )               
 
-    if not periodFran or not periodTom:
+    if not fromDate or not toDate:
         return func.HttpResponse(
-            "Missing 'periodFran' or 'periodTom' query parameter.",
+            "Missing 'fromDate' or 'toDate' query parameter.",
             status_code=400,
         )
+
+    fromPeriod = to_month_period(fromDate)
+    toPeriod = to_month_period(toDate)
 
     query = """
         SELECT 
@@ -309,8 +332,8 @@ def MiljorapportAvfall(req: func.HttpRequest) -> func.HttpResponse:
             END AS volymM3,
         [TypAvVikt]
         from [TX_MDW_Dev].[MDW].[MiljörapportAvfallAggregated]
-        where Anläggningsnummer = %(Anlaggningsnummer)s
-            AND [PeriodÅrMånad] BETWEEN %(periodFran)s AND %(periodTom)s
+        where Anläggningsnummer = %(anlaggningsnr)s
+            AND [PeriodÅrMånad] BETWEEN %(fromPeriod)s AND %(toPeriod)s
         
         group by
 
@@ -326,10 +349,15 @@ def MiljorapportAvfall(req: func.HttpRequest) -> func.HttpResponse:
         """
 
     try:
-        rows = execute_select(query, {"Anlaggningsnummer": Anlaggningsnummer,
-                                       "periodFran": periodFran,
-                                        "periodTom": periodTom},
-                             database="dev")
+        rows = execute_select(
+            query,
+            {
+                "anlaggningsnr": anlaggningsnr,
+                "fromPeriod": fromPeriod,
+                "toPeriod": toPeriod,
+            },
+            database="dev",
+        )
     except Exception as error:
         logging.exception("Database request failed.")
         return func.HttpResponse(
@@ -340,8 +368,8 @@ def MiljorapportAvfall(req: func.HttpRequest) -> func.HttpResponse:
     try:
         data = [
             {
-                "rapportFran": periodFran,
-                "rapportTom": periodTom,
+                "rapportFran": fromDate,
+                "rapportTom": toDate,
                 "anlaggningsnummer": str(row["Anläggningsnummer"]),
                 "adress": row["Adress"],
                 "tjanstetyp": row["Tjänstetyp"],
